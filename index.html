@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>TROMPOS: Choque de Leyendas — Prototipo 0.7 Online</title>
+<style>
+  :root { color-scheme: dark; --cyan:#53e7ff; --orange:#ff9a4b; --panel:rgba(7,13,28,.82); }
+  * { box-sizing:border-box; }
+  html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#060913; color:#f5f8ff; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  #game { display:block; width:100%; height:100%; touch-action:none; }
+  .panel { background:var(--panel); border:1px solid rgba(155,190,255,.24); border-radius:14px; backdrop-filter:blur(10px); box-shadow:0 8px 30px #0005; }
+  #hud { position:fixed; top:12px; left:12px; right:12px; display:flex; gap:10px; align-items:flex-start; pointer-events:none; }
+  .fighter { padding:10px 12px; width:min(34vw,290px); }
+  .fighter.right { margin-left:auto; text-align:right; }
+  .name { font-size:12px; letter-spacing:.13em; text-transform:uppercase; opacity:.8; font-weight:800; }
+  .big { font-size:clamp(17px,3vw,25px); font-weight:900; line-height:1.2; }
+  .bar { height:8px; background:#ffffff20; border-radius:99px; overflow:hidden; margin-top:7px; }
+  .fill { height:100%; width:100%; transition:width .12s linear; border-radius:99px; }
+  #playerSpin { background:linear-gradient(90deg,#168dff,#53e7ff); }
+  #playerHull { background:linear-gradient(90deg,#36d59a,#c3ffdc); }
+  #enemySpin { background:linear-gradient(90deg,#ffca69,#ff784b); }
+  #enemyHull { background:linear-gradient(90deg,#ff554f,#ffb15b); }
+  .statlabel { font-size:10px; opacity:.65; margin-top:5px; }
+  #topcenter { position:fixed; top:12px; left:50%; transform:translateX(-50%); padding:8px 12px; text-align:center; min-width:130px; }
+  #timer { font-size:22px; font-weight:900; font-variant-numeric:tabular-nums; }
+  #status { font-size:11px; opacity:.8; }
+  #hint { position:fixed; left:50%; top:88px; transform:translateX(-50%); width:max-content; max-width:calc(100% - 24px); padding:7px 11px; font-size:12px; text-align:center; }
+  #bottom { position:fixed; left:12px; right:12px; bottom:12px; display:flex; align-items:flex-end; justify-content:space-between; gap:10px; pointer-events:none; }
+  #help { padding:10px 12px; font-size:12px; line-height:1.5; max-width:360px; }
+  #energyBox { padding:10px 12px; width:min(40vw,250px); }
+  #energyFill { height:8px; background:linear-gradient(90deg,#9a66ff,#e7a5ff); width:0%; border-radius:99px; transition:width .1s; }
+  #energyLabel { display:flex; justify-content:space-between; font-size:11px; margin-bottom:6px; }
+  #buttons { position:fixed; right:14px; bottom:108px; display:flex; flex-direction:column; gap:9px; align-items:flex-end; }
+  .action { pointer-events:auto; border:1px solid #ffffff3b; color:white; background:#101a30dd; border-radius:50%; width:64px; height:64px; font-weight:900; font-size:11px; box-shadow:0 5px 18px #0006; touch-action:none; }
+  .action:active { transform:scale(.95); background:#26385c; }
+  #attack { border-color:#ffae68aa; } #boost { border-color:#62eaffaa; } #drift { border-color:#c08affaa; }
+  #stabilityBox { margin-top:7px; } #stabilityFill { height:6px; width:100%; background:linear-gradient(90deg,#a46aff,#e2c0ff); border-radius:99px; }
+  #movePad { position:fixed; left:16px; bottom:104px; width:140px; height:140px; display:none; touch-action:none; }
+  #padBase { position:absolute; inset:0; border-radius:50%; background:#15223c99; border:1px solid #ffffff35; }
+  #padKnob { position:absolute; left:42px; top:42px; width:56px; height:56px; border-radius:50%; background:#80dfffaa; border:1px solid #d6f7ff; box-shadow:0 0 20px #53e7ff55; }
+  #overlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:radial-gradient(ellipse at center,#101c36bb,#02040bea); padding:20px; }
+  #card { width:min(540px,100%); padding:24px; text-align:center; }
+  h1 { margin:0 0 8px; font-size:clamp(26px,6vw,42px); line-height:1.02; letter-spacing:-.04em; }
+  .sub { color:#aabbd9; margin:0 auto 20px; max-width:420px; line-height:1.5; }
+  .primary { border:0; background:linear-gradient(100deg,#168dff,#8c72ff); color:white; font-weight:900; border-radius:12px; padding:13px 22px; font-size:15px; cursor:pointer; }
+  .secondary { border:1px solid #ffffff30; background:#ffffff0c; color:#dce7ff; border-radius:12px; padding:10px 15px; cursor:pointer; font-weight:700; }
+  .rowbuttons { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:12px; }
+  .features { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:18px 0; text-align:left; }
+  .feature { border:1px solid #ffffff1b; border-radius:10px; padding:10px; font-size:12px; color:#c9d7f2; }
+  .feature b { display:block; color:white; font-size:13px; margin-bottom:4px; }
+  #toast { position:fixed; top:135px; left:50%; transform:translateX(-50%); padding:9px 14px; background:#101a30ee; border:1px solid #ffffff30; border-radius:12px; font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; text-align:center; max-width:90vw; }
+  #toast.show { opacity:1; }
+  #ultimate { border-color:#e7a5ffbb; background:#382252ee; } #ultBurst { border-color:#69dfff; background:#10375cee; }
+  #specialFill { height:8px; width:0%; border-radius:99px; background:linear-gradient(90deg,#ff54e8,#ffe18c); transition:width .12s; }
+  #shopPanel { display:none; position:fixed; inset:0; z-index:8; background:#02040bed; padding:16px; overflow:auto; }
+  #shopInner { width:min(760px,100%); margin:20px auto; padding:20px; }
+  .shopgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin:18px 0; }
+  .shopitem { text-align:left; border:1px solid #ffffff28; border-radius:12px; padding:13px; background:#101a30; }
+  .shopitem h3 { margin:0 0 7px; font-size:16px; }
+  .shopitem p { margin:0 0 10px; font-size:12px; color:#b9c8e4; line-height:1.4; }
+  .shopitem button { border:0; border-radius:8px; padding:8px 10px; font-weight:800; background:#2d8dff; color:white; }
+  #modeBtn { margin-top:10px; }
+  #multiPanel { display:none; position:fixed; inset:0; z-index:12; background:radial-gradient(ellipse at center,#101c36f2,#02040bf7); padding:18px; overflow:auto; }
+  #multiInner { width:min(560px,100%); margin:4vh auto; padding:22px; text-align:center; }
+  .roomCode { font-size:clamp(30px,8vw,46px); letter-spacing:.22em; font-weight:1000; color:#7cecff; padding:12px; border:1px dashed #53e7ff77; border-radius:14px; background:#53e7ff0b; margin:12px 0; }
+  .lobbyStatus { border:1px solid #ffffff22; border-radius:12px; padding:12px; margin:12px 0; background:#ffffff08; }
+  .lobbyStatus b { color:#fff; }
+  .roomInput { width:100%; padding:13px 14px; border-radius:10px; border:1px solid #ffffff35; background:#080e1c; color:white; font-size:18px; letter-spacing:.15em; text-align:center; text-transform:uppercase; }
+  .mutedNote { font-size:11px; line-height:1.5; color:#91a4c8; }
+  .primary:disabled { opacity:.38; cursor:not-allowed; filter:grayscale(.4); }
+  #mashPrompt { display:none; position:fixed; z-index:6; left:50%; top:50%; transform:translate(-50%,-50%); width:min(440px,90vw); text-align:center; padding:20px; background:#190d2eee; border:2px solid #e7a5ff; border-radius:18px; box-shadow:0 0 45px #b84cff77; }
+  #mashButton { width:100%; margin-top:12px; padding:18px; font-size:20px; font-weight:1000; border:0; border-radius:14px; color:white; background:linear-gradient(90deg,#8c43ff,#ff48c4); touch-action:manipulation; }
+  .coinpill { color:#ffe18c; font-weight:900; }
+  @media(max-width:600px){ #shopInner{padding:13px;margin:0 auto}.shopgrid{grid-template-columns:1fr 1fr}.shopitem{padding:9px}.shopitem h3{font-size:13px}.shopitem p{font-size:11px} }
+  @media (pointer:coarse) { #movePad { display:block; } #help { max-width:calc(100vw - 190px); font-size:10px; } #buttons { bottom:100px; } }
+  @media(max-width:600px) {
+    #hud { top:7px; left:7px; right:7px; gap:5px; }
+    .fighter { padding:8px; width:31vw; }
+    .name { font-size:9px; } .statlabel { font-size:8px; } .bar { height:6px; margin-top:5px; }
+    #topcenter { top:7px; padding:6px 8px; min-width:82px; }
+    #timer { font-size:18px; } #status { font-size:9px; }
+    #hint { top:72px; font-size:10px; }
+    #bottom { left:7px; right:7px; bottom:7px; }
+    #help { padding:8px; }
+    #energyBox { padding:8px; }
+    .action { width:58px; height:58px; }
+    #movePad { width:124px; height:124px; left:10px; bottom:95px; }
+    #padKnob { left:36px; top:36px; width:52px; height:52px; }
+    .features { grid-template-columns:1fr; text-align:center; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div class="fighter panel">
+    <div class="name">Jugador</div><div class="big">Trompo azul</div>
+    <div class="statlabel">GIRO <span id="pSpinText">100</span></div><div class="bar"><div id="playerSpin" class="fill"></div></div>
+    <div class="statlabel">ESTRUCTURA <span id="pHullText">1000</span></div><div class="bar"><div id="playerHull" class="fill"></div></div>
+  </div>
+  <div id="topcenter" class="panel"><div id="timer">03:00</div><div id="status">PREPARADOS</div></div>
+  <div class="fighter panel right">
+    <div class="name">Rival de prueba</div><div class="big">Trompo ámbar</div>
+    <div class="statlabel">GIRO <span id="eSpinText">100</span></div><div class="bar"><div id="enemySpin" class="fill"></div></div>
+    <div class="statlabel">ESTRUCTURA <span id="eHullText">1000</span></div><div class="bar"><div id="enemyHull" class="fill"></div></div>
+  </div>
+</div>
+<div id="hint" class="panel">¡La ultra se carga sola! Cuando aparezca la espada, apunta al rival y pulsa F.</div>
+<div id="toast"></div>
+<div id="bottom">
+  <div id="help" class="panel">
+    <b>CONTROLES</b><br>
+    P1: <b>WASD</b> · ESPACIO impulso · E ataque · Q tubos · F ultra<br>
+    P2 local: <b>FLECHAS</b> · ENTER ataque · SHIFT derecho impulso.
+  </div>
+  <div id="energyBox" class="panel">
+    <div id="energyLabel"><b>ENERGÍA</b><span><span id="energyText">0</span>/100</span></div>
+    <div class="bar"><div id="energyFill"></div></div>
+    <div class="statlabel">TÉCNICA DE LOS TUBOS</div><div class="bar"><div id="specialFill"></div></div><div class="statlabel"><span id="specialText">0</span>/100 · Ataca para cargarla</div>
+    <div class="statlabel" style="margin-top:9px;color:#83dfff;font-weight:900">ULTRA TÉCNICA</div><div class="bar"><div id="ultChargeFill" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#1d7bff,#a9f4ff);transition:width .12s"></div></div><div class="statlabel"><span id="ultChargeText">0</span>/100 · Se carga con el tiempo</div>
+    <div id="stabilityBox"><div class="statlabel">CONTROL DE DESLIZAMIENTO <span id="stabilityText">100</span></div><div class="bar"><div id="stabilityFill"></div></div></div>
+  </div>
+</div>
+<div id="movePad"><div id="padBase"></div><div id="padKnob"></div></div>
+<div id="buttons">
+  <button class="action" id="drift" aria-label="Deslizamiento">DESLIZAR<br>SHIFT</button>
+  <button class="action" id="boost" aria-label="Impulso">IMPULSO<br>SPACE</button>
+  <button class="action" id="attack" aria-label="Ataque">EMBESTIDA<br>E</button><button class="action" id="ultimate" aria-label="Técnica de tubos">TUBOS<br>Q</button><button class="action" id="ultBurst" aria-label="Ultra técnica">ULTRA<br>F</button>
+</div>
+
+<div id="overlay">
+  <div id="card" class="panel">
+    <div style="font-size:12px;letter-spacing:.2em;color:#75dfff;font-weight:900;margin-bottom:12px">PROTOTIPO JUGABLE 0.7 ONLINE</div>
+    <h1>TROMPOS:<br>CHOQUE DE LEYENDAS</h1>
+    <p class="sub">Dos trompos. Una arena. Cada impacto cuenta.<br>Combate con giro ampliado, recuperación al moverte, arena más segura, técnica cinematográfica, tienda y guardado local. No hay protagonista definido.</p>
+    <div class="features">
+      <div class="feature"><b>🌀 Física inicial</b>Movimiento con inercia, giros y choques.</div>
+      <div class="feature"><b>⚡ Gestión de giro</b>Acelera con cuidado o te quedarás sin impulso.</div>
+      <div class="feature"><b>🎯 Combate</b>Embestida manual y energía por impactos acertados.</div>
+    </div>
+    <button class="primary" id="startBtn">EMPEZAR COMBATE VS IA</button><div class="rowbuttons"><button class="secondary" id="modeBtn">Modo: contra IA (cambiar a 2 jugadores)</button><button class="secondary" id="multiBtn">MULTIJUGADOR ONLINE</button><button class="secondary" id="shopBtn">TIENDA DE TROMPOS</button></div><p class="statlabel">Monedas guardadas: <span class="coinpill" id="coinText">0</span></p>
+    <div class="rowbuttons"><button class="secondary" id="howBtn">¿Cómo se juega?</button><button class="secondary" id="resetBtn">Reiniciar prueba</button></div>
+    <p id="howText" style="display:none;color:#bac9e5;font-size:13px;line-height:1.55;margin:16px 0 0">Muévete para ganar posición. El giro dura mucho más y recuperas un poco mientras te desplazas a buena velocidad; el impulso consume giro. Mantén SHIFT o DESLIZAR mientras giras para ganar velocidad; en línea recta serás algo más lento. Si abusas, pierdes control y puedes irte contra el borde. Pulsa Embestida cerca del rival para causar daño. Los choques repetidos ralentizan a ambos y un forcejeo largo puede lanzar a uno fuera. Ganas si el rival pierde todo el giro, se queda sin estructura o sale de la arena.</p>
+    <p style="font-size:11px;color:#7183a6;margin:18px 0 0">El progreso se guarda en este navegador. El multijugador local de teclado es para dos personas en el mismo dispositivo; el online requiere un servidor.</p>
+  </div>
+</div>
+<div id="multiPanel"><div id="multiInner" class="panel">
+  <div style="font-size:12px;letter-spacing:.2em;color:#75dfff;font-weight:900;margin-bottom:10px">SALA MULTIJUGADOR</div>
+  <h1 id="multiTitle">JUEGA CON UN AMIGO</h1>
+  <p class="sub" id="multiSubtitle">Crea una sala o entra con el código de otra persona.</p>
+  <div id="multiChoices" class="rowbuttons"><button class="primary" id="createRoomBtn">CREAR PARTIDA</button><button class="secondary" id="joinRoomBtn">ENTRAR A UNA PARTIDA</button></div>
+  <div id="hostRoomView" style="display:none">
+    <p class="statlabel">CÓDIGO DE LA SALA</p><div class="roomCode" id="roomCodeText">----</div>
+    <div class="rowbuttons"><button class="secondary" id="copyRoomBtn">COPIAR CÓDIGO</button></div>
+    <div class="lobbyStatus"><div style="font-size:13px;color:#9db2d7">JUGADORES EN LA SALA</div><div style="font-size:28px;font-weight:1000" id="roomCount">1 / 2</div><div id="roomStatusText" class="statlabel">Esperando al segundo jugador…</div></div>
+    <button class="primary" id="hostStartBtn" disabled>INICIAR PARTIDA</button>
+  </div>
+  <div id="joinRoomView" style="display:none">
+    <label for="roomCodeInput" class="statlabel" style="display:block;margin-bottom:8px">INTRODUCE EL CÓDIGO DE TU AMIGO</label><input id="roomCodeInput" class="roomInput" maxlength="6" placeholder="ABC123" autocomplete="off" />
+    <div class="rowbuttons"><button class="primary" id="submitJoinBtn">ENTRAR</button><button class="secondary" id="cancelJoinBtn">VOLVER</button></div><p id="joinMessage" class="mutedNote"></p>
+  </div>
+  <div id="joinedRoomView" style="display:none"><div class="roomCode" id="joinedCodeText">----</div><div class="lobbyStatus"><b>Te has unido a la sala en este navegador.</b><p class="mutedNote">La conexión real de juego entre dispositivos aún necesita un servicio de señalización y sincronización.</p></div><button class="secondary" id="leaveRoomBtn">SALIR DE LA SALA</button></div>
+  <p class="mutedNote" style="margin-top:18px">Salas online conectadas a Firebase. Esta versión prueba la creación y unión de salas entre dispositivos; el combate sincronizado todavía no está implementado.</p>
+  <div class="rowbuttons"><button class="secondary" id="closeMultiBtn">VOLVER AL MENÚ</button></div>
+</div></div>
+<div id="shopPanel"><div id="shopInner" class="panel"><h1>TIENDA DE TROMPOS</h1><p class="sub">Compra estilos y trompos con estadísticas diferentes. Las compras y monedas se guardan en este navegador.</p><p>Monedas: <b class="coinpill" id="shopCoins">0</b></p><div class="shopgrid" id="shopGrid"></div><div class="rowbuttons"><button class="primary" id="closeShop">VOLVER</button></div></div></div>
+<div id="mashPrompt"><div style="font-size:12px;letter-spacing:.16em;font-weight:900;color:#e7a5ff">IMPACTO FINAL</div><h2 style="margin:8px 0">¡PULSA LO MÁS RÁPIDO QUE PUEDAS!</h2><p id="mashText">El rival también está luchando por imponerse...</p><button id="mashButton">¡PULSAR!</button><p style="font-size:11px;opacity:.7">En modo local, el jugador 2 usa ENTER.</p></div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
+<script>
+// Configuración pública de la aplicación web Firebase del proyecto del usuario.
+const firebaseConfig = {
+  apiKey: "AIzaSyBL8wkNg7BlqDa4OCPlj5bZTNs_saECHfE",
+  authDomain: "tromposchoqueleyendas.firebaseapp.com",
+  databaseURL: "https://tromposchoqueleyendas-default-rtdb.firebaseio.com",
+  projectId: "tromposchoqueleyendas",
+  storageBucket: "tromposchoqueleyendas.firebasestorage.app",
+  messagingSenderId: "183788859045",
+  appId: "1:183788859045:web:92113a343c87e4a8b1a74c"
+};
+let firebaseReady=false, firebaseUser=null, firebaseDb=null;
+let firebaseConnectionState='loading', firebaseConnectionMessage='Conectando con Firebase…';
+function updateFirebaseConnection(message, state){
+  firebaseConnectionMessage=message;
+  if(state) firebaseConnectionState=state;
+  const status=document.querySelector('#multiSubtitle');
+  if(status && document.querySelector('#multiPanel')?.style.display==='block'){
+    status.textContent = firebaseReady ? 'Conectado a Firebase. Crea una sala o entra con un código.' : firebaseConnectionMessage;
+  }
+}
+// Evita que la pantalla se quede eternamente en “Conectando” si el navegador
+// bloquea Firebase, falta Internet o la autenticación no responde.
+const firebaseConnectTimer=setTimeout(()=>{
+  if(!firebaseReady && firebaseConnectionState==='loading'){
+    updateFirebaseConnection('Firebase no respondió. Comprueba Internet y que abriste el archivo 0.8; si sigue igual, necesitaremos alojarlo en una página HTTPS.', 'timeout');
+  }
+},12000);
+try {
+  if(!window.firebase || !firebase.apps){
+    updateFirebaseConnection('No se cargó el SDK de Firebase. Comprueba Internet y vuelve a abrir el archivo.', 'sdk-error');
+    clearTimeout(firebaseConnectTimer);
+  } else {
+    firebase.initializeApp(firebaseConfig);
+    firebaseDb=firebase.database();
+    firebase.auth().signInAnonymously().then(cred=>{
+      firebaseUser=cred.user; firebaseReady=true; firebaseConnectionState='ready';
+      clearTimeout(firebaseConnectTimer);
+      updateFirebaseConnection('Conectado a Firebase. Crea una sala o entra con un código.', 'ready');
+    }).catch(err=>{
+      console.error('Firebase Auth:',err);
+      clearTimeout(firebaseConnectTimer);
+      let reason='No se pudo iniciar sesión en Firebase.';
+      if(err && (err.code==='auth/operation-not-allowed')) reason='Firebase: activa el proveedor de acceso Anónimo en Authentication.';
+      else if(err && (err.code==='auth/unauthorized-domain')) reason='Firebase no autoriza el origen de esta página. Tendremos que abrir el juego desde una dirección web HTTPS.';
+      else if(err && (err.code==='auth/network-request-failed')) reason='No se pudo conectar con Firebase. Comprueba Internet o si Chrome bloquea la conexión.';
+      else if(err && err.message) reason+=' Detalle: '+err.message;
+      updateFirebaseConnection(reason, 'error');
+    });
+  }
+} catch(e) {
+  console.error('Firebase initialization:',e);
+  clearTimeout(firebaseConnectTimer);
+  updateFirebaseConnection('No se pudo iniciar Firebase: '+(e.message||'error de inicialización'), 'error');
+}
+
+
+const canvas = document.querySelector('#game');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070b17);
+scene.fog = new THREE.Fog(0x070b17, 18, 42);
+const camera = new THREE.PerspectiveCamera(43, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0, 13, 19);
+camera.lookAt(0,0,0);
+
+scene.add(new THREE.HemisphereLight(0x9fcaff, 0x182039, 2.1));
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.1);
+keyLight.position.set(-5,12,8); keyLight.castShadow=true; keyLight.shadow.mapSize.set(1024,1024); scene.add(keyLight);
+const rimLight = new THREE.PointLight(0x31cfff, 35, 22); rimLight.position.set(0,4,-8); scene.add(rimLight);
+const warmLight = new THREE.PointLight(0xff7938, 25, 18); warmLight.position.set(6,3,4); scene.add(warmLight);
+
+const floor = new THREE.Mesh(new THREE.CircleGeometry(8.4, 96), new THREE.MeshStandardMaterial({color:0x101b31, roughness:.55, metalness:.35}));
+floor.rotation.x=-Math.PI/2; floor.position.y=-.22; floor.receiveShadow=true; scene.add(floor);
+const rim = new THREE.Mesh(new THREE.TorusGeometry(8.35,.23,14,120), new THREE.MeshStandardMaterial({color:0x273b63,metalness:.75,roughness:.28,emissive:0x091a3b}));
+rim.rotation.x=Math.PI/2; rim.position.y=-.04; rim.receiveShadow=true; scene.add(rim);
+const innerLine = new THREE.Mesh(new THREE.TorusGeometry(6.3,.025,8,120), new THREE.MeshBasicMaterial({color:0x3b6da2}));
+innerLine.rotation.x=Math.PI/2; innerLine.position.y=-.195; scene.add(innerLine);
+for (let i=0;i<24;i++){
+  const a=i/24*Math.PI*2;
+  const marker=new THREE.Mesh(new THREE.BoxGeometry(.08,.025,.55),new THREE.MeshBasicMaterial({color:i%2?0x23446c:0x2d7497}));
+  marker.position.set(Math.cos(a)*7.55,-.19,Math.sin(a)*7.55); marker.rotation.y=-a; scene.add(marker);
+}
+const grid = new THREE.GridHelper(50,50,0x172744,0x101b31); grid.position.y=-.25; scene.add(grid);
+const arenaGlow = new THREE.Mesh(new THREE.TorusGeometry(8.7,.035,8,128),new THREE.MeshBasicMaterial({color:0x1763a0}));
+arenaGlow.rotation.x=Math.PI/2; arenaGlow.position.y=-.22; scene.add(arenaGlow);
+// Tubos luminosos decorativos: forman el circuito de la técnica especial.
+const tubeMat=new THREE.MeshStandardMaterial({color:0x522d92,metalness:.55,roughness:.25,emissive:0x7b35ff,emissiveIntensity:.65});
+for(let i=0;i<4;i++){
+ const a=i*Math.PI/2, x=Math.cos(a)*5.7, z=Math.sin(a)*5.7;
+ const tube=new THREE.Mesh(new THREE.TorusGeometry(1.15,.12,10,40),tubeMat);
+ tube.position.set(x,.7,z);tube.rotation.x=Math.PI/2; tube.rotation.z=a*.35;scene.add(tube);
+ const post=new THREE.Mesh(new THREE.CylinderGeometry(.10,.14,1.25,10),tubeMat);post.position.set(x,0,z);scene.add(post);
+}
+
+function makeTop(color, accent, isPlayer) {
+  const group = new THREE.Group();
+  const mainMat = new THREE.MeshStandardMaterial({color, metalness:.62, roughness:.26});
+  const accentMat = new THREE.MeshStandardMaterial({color:accent, metalness:.5, roughness:.22, emissive:accent, emissiveIntensity:.35});
+  const darkMat = new THREE.MeshStandardMaterial({color:0x11182a,metalness:.7,roughness:.25});
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(.34,.52,.16,12), darkMat);
+  base.position.y=.05; base.castShadow=true; group.add(base);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.48,.25,.28,12), mainMat);
+  body.position.y=.24; body.castShadow=true; group.add(body);
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(.33,.48,.10,12), accentMat);
+  crown.position.y=.43; crown.castShadow=true; group.add(crown);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(.2,16,10),accentMat);
+  cap.scale.y=.55; cap.position.y=.51; cap.castShadow=true; group.add(cap);
+  for(let i=0;i<6;i++){
+    const a=i*Math.PI/3;
+    const blade=new THREE.Mesh(new THREE.BoxGeometry(.12,.11,.38),accentMat);
+    blade.position.set(Math.cos(a)*.38,.31,Math.sin(a)*.38);
+    blade.rotation.y=-a; blade.castShadow=true; group.add(blade);
+  }
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.45,.035,8,48),new THREE.MeshBasicMaterial({color:accent}));
+  ring.rotation.x=Math.PI/2; ring.position.y=.38; group.add(ring);
+  const aura = new THREE.Mesh(new THREE.TorusGeometry(.64,.025,8,48),new THREE.MeshBasicMaterial({color:accent,transparent:true,opacity:.55}));
+  aura.rotation.x=Math.PI/2; aura.position.y=.03; group.add(aura);
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(.65,32),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.24,depthWrite:false}));
+  shadow.rotation.x=-Math.PI/2; shadow.position.y=-.16; group.add(shadow);
+  scene.add(group);
+  return {group, ring, aura, color, accent, isPlayer};
+}
+const player = makeTop(0x147bdb,0x5cecff,true);
+const enemy = makeTop(0xd45b25,0xffbd63,false);
+player.group.position.set(-3,0,0);
+enemy.group.position.set(3,0,0);
+
+const particles=[];
+function burst(pos,color,count=14,power=2.8){
+  for(let i=0;i<count;i++){
+    const mesh=new THREE.Mesh(new THREE.SphereGeometry(.045+Math.random()*.045,6,6),new THREE.MeshBasicMaterial({color,transparent:true,opacity:1}));
+    mesh.position.copy(pos); scene.add(mesh);
+    const a=Math.random()*Math.PI*2, v=.6+Math.random()*power;
+    particles.push({mesh,vel:new THREE.Vector3(Math.cos(a)*v,Math.random()*2,Math.sin(a)*v),life:.45+Math.random()*.5,max:.95});
+  }
+}
+function ringBurst(pos,color){
+  const m=new THREE.Mesh(new THREE.TorusGeometry(.35,.045,8,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9}));
+  m.rotation.x=Math.PI/2;m.position.copy(pos);m.position.y=.1;scene.add(m);
+  particles.push({mesh:m,vel:new THREE.Vector3(0,1.4,0),life:.42,max:.42,ring:true});
+}
+const keys={};
+window.addEventListener('keydown',e=>{keys[e.code]=true;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='KeyE')attack();if(e.code==='Space')boost();if(e.code==='KeyQ')activateUltimate();if(e.code==='KeyF')activateLegendaryUlt();if(e.code==='Enter'&&gameMode==='local'&&mashActive){mashP2++;}if(e.code==='Enter'&&gameMode==='local'&&!mashActive)attack(true);if(e.code==='ControlRight'&&gameMode==='local'&&!mashActive)attack(true);if(e.code==='ShiftRight'&&gameMode==='local'&&!mashActive&&enemyState.spin>18){enemyState.boosting=.45;enemyState.spin=Math.max(0,enemyState.spin-12);}if(e.code==='KeyR')resetGame();});
+window.addEventListener('keyup',e=>keys[e.code]=false);
+let running=false, ended=false, timeLeft=240, energy=0, specialCharge=0, boostCooldown=0, attackCooldown=0, specialCooldown=0, toastTimer=0, clashTimer=0, clashCooldown=0, clashFlash=0;
+let gameMode='ai', ultimateActive=false, ultimateTime=0, mashActive=false, mashTime=0, mashP1=0, mashP2=0, mashWinner=null;
+let legendaryCharge=0, legendaryPhase='idle', legendaryTime=0, legendaryDir=new THREE.Vector3(1,0,0), legendaryHitCount=0, legendaryLastHit=-1, legendarySword=null, legendaryKnight=null, legendaryGhosts=[];
+const saveKey='tromposChoqueLeyendasSave03';
+const shopItems=[
+ {id:'classic',name:'Clásico Azul',cost:0,desc:'Equilibrado. El diseño original.',attack:1,defense:1,mobility:1,color:0x147bdb,accent:0x5cecff},
+ {id:'bulwark',name:'Bastión',cost:80,desc:'Más defensa y estabilidad, pero menos movilidad.',attack:.9,defense:1.45,mobility:.82,color:0x287c64,accent:0x8affc4},
+ {id:'breaker',name:'Quebrantador',cost:120,desc:'Golpes más fuertes, a cambio de menos defensa.',attack:1.45,defense:.78,mobility:1,color:0xa52e4b,accent:0xff6e92},
+ {id:'comet',name:'Cometa',cost:150,desc:'Gran movilidad y recuperación de control.',attack:1.05,defense:.9,mobility:1.35,color:0x5a43bc,accent:0xc8a4ff},
+ {id:'gold',name:'Corona Solar',cost:60,desc:'Diseño dorado para tu trompo; no cambia sus estadísticas.',cosmetic:true,color:0xc28b22,accent:0xffe28a}
+];
+let saveData={coins:0,owned:['classic'],selected:'classic',skin:'classic',wins:0};
+try{const raw=localStorage.getItem(saveKey);if(raw)saveData={...saveData,...JSON.parse(raw)};}catch(e){}
+function saveProgress(){try{localStorage.setItem(saveKey,JSON.stringify(saveData));}catch(e){showToast('El navegador no permitió guardar el progreso.');}}
+function selectedTop(){return shopItems.find(i=>i.id===saveData.selected)||shopItems[0];}
+let driftHeld=false;
+let lastTime=performance.now();
+const playerState={pos:new THREE.Vector3(-3,0,0),vel:new THREE.Vector3(),spin:1200,hull:1000,spinAngle:0,stun:0,boosting:0,drift:0,stability:100,driftWobble:0,attackWindup:0,attackActive:0,attackPower:0,ai:false};
+const enemyState={pos:new THREE.Vector3(3,0,0),vel:new THREE.Vector3(),spin:1200,hull:1000,spinAngle:0,stun:0,boosting:0,drift:0,stability:100,driftWobble:0,attackWindup:0,attackActive:0,attackPower:0,ai:true};
+function showToast(s){const el=document.querySelector('#toast');el.textContent=s;el.classList.add('show');toastTimer=1.6;}
+function resetState(s,x,z){s.pos.set(x,0,z);s.vel.set(0,0,0);s.spin=1200;s.hull=1000;s.spinAngle=0;s.stun=0;s.boosting=0;s.drift=0;s.stability=100;s.driftWobble=0;s.attackWindup=0;s.attackActive=0;s.attackPower=0;}
+const menuMarkup=document.querySelector('#card').innerHTML;
+function bindMenuButtons(){
+ const start=document.querySelector('#startBtn'), reset=document.querySelector('#resetBtn'), how=document.querySelector('#howBtn'), mode=document.querySelector('#modeBtn'), shop=document.querySelector('#shopBtn'), multi=document.querySelector('#multiBtn');
+ if(start)start.onclick=()=>{if(ended||!running)startGame();};
+ if(reset)reset.onclick=resetGame;
+ if(how)how.onclick=()=>{const t=document.querySelector('#howText');t.style.display=t.style.display==='none'?'block':'none';};
+ if(mode)mode.onclick=()=>{gameMode=gameMode==='ai'?'local':'ai';mode.textContent=gameMode==='ai'?'Modo: contra IA (cambiar a 2 jugadores)':'Modo: 2 jugadores local (cambiar a IA)';start.textContent=gameMode==='ai'?'EMPEZAR COMBATE VS IA':'EMPEZAR COMBATE 2 JUGADORES';};
+ if(shop)shop.onclick=()=>{refreshShop();document.querySelector('#shopPanel').style.display='block';};
+ if(multi)multi.onclick=openMultiplayer;
+}
+
+let activeRoomCode=null, roomPoll=null, roomRole=null, roomRef=null, roomListener=null;
+function makeRoomCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let out='';for(let i=0;i<6;i++)out+=chars[Math.floor(Math.random()*chars.length)];return out;}
+function openMultiplayer(){document.querySelector('#multiPanel').style.display='block';document.querySelector('#overlay').style.display='none';showRoomChoices();if(!firebaseReady)document.querySelector('#multiSubtitle').textContent=firebaseConnectionMessage;}
+function showRoomChoices(){stopRoomPoll();activeRoomCode=null;roomRole=null;roomRef=null;document.querySelector('#multiChoices').style.display='flex';document.querySelector('#hostRoomView').style.display='none';document.querySelector('#joinRoomView').style.display='none';document.querySelector('#joinedRoomView').style.display='none';document.querySelector('#multiTitle').textContent='JUEGA CON UN AMIGO';document.querySelector('#multiSubtitle').textContent=firebaseReady?'Conectado a Firebase. Crea una sala o entra con un código.':firebaseConnectionMessage;}
+function stopRoomPoll(){if(roomRef&&roomListener){roomRef.off('value',roomListener);}roomListener=null;roomRef=null;if(roomPoll){clearInterval(roomPoll);roomPoll=null;}}
+async function createRoom(){
+ const msg=document.querySelector('#multiSubtitle');
+ if(!firebaseReady||!firebaseUser||!firebaseDb){msg.textContent='Firebase aún está conectando. Espera unos segundos y vuelve a intentarlo.';return;}
+ try{
+  let code=makeRoomCode(), ref=firebaseDb.ref('rooms/'+code), snap=await ref.get();
+  while(snap.exists()){code=makeRoomCode();ref=firebaseDb.ref('rooms/'+code);snap=await ref.get();}
+  await ref.set({hostUid:firebaseUser.uid,guestUid:null,status:'waiting',createdAt:firebase.database.ServerValue.TIMESTAMP});
+  activeRoomCode=code;roomRole='host';roomRef=ref;
+  document.querySelector('#multiChoices').style.display='none';document.querySelector('#hostRoomView').style.display='block';document.querySelector('#joinRoomView').style.display='none';document.querySelector('#joinedRoomView').style.display='none';document.querySelector('#multiTitle').textContent='SALA CREADA';document.querySelector('#multiSubtitle').textContent='Comparte este código con tu amigo.';document.querySelector('#roomCodeText').textContent=code;
+  roomListener=snap=>{const room=snap.val();if(!room){document.querySelector('#roomStatusText').textContent='La sala ya no existe.';document.querySelector('#hostStartBtn').disabled=true;return;}const count=room.guestUid?2:1;document.querySelector('#roomCount').textContent=count+' / 2';document.querySelector('#roomStatusText').textContent=count===2?'¡El segundo jugador se unió!':'Esperando al segundo jugador…';document.querySelector('#hostStartBtn').disabled=count<2;};ref.on('value',roomListener);
+ }catch(e){console.error(e);msg.textContent='No se pudo crear la sala. Firebase puede necesitar que configures las reglas de seguridad.';}
+}
+function refreshRoomStatus(){}
+function showJoinForm(){document.querySelector('#multiChoices').style.display='none';document.querySelector('#hostRoomView').style.display='none';document.querySelector('#joinRoomView').style.display='block';document.querySelector('#joinedRoomView').style.display='none';document.querySelector('#multiTitle').textContent='ENTRAR A UNA SALA';document.querySelector('#multiSubtitle').textContent='Escribe el código de seis caracteres.';document.querySelector('#joinMessage').textContent='';document.querySelector('#roomCodeInput').value='';}
+async function joinRoom(){
+ const code=document.querySelector('#roomCodeInput').value.trim().toUpperCase();const msg=document.querySelector('#joinMessage');
+ if(!/^[A-HJ-NP-Z2-9]{6}$/.test(code)){msg.textContent='El código debe tener 6 caracteres.';return;}
+ if(!firebaseReady||!firebaseUser||!firebaseDb){msg.textContent='Firebase aún está conectando. Espera unos segundos y vuelve a intentarlo.';return;}
+ try{
+  const ref=firebaseDb.ref('rooms/'+code);let result;
+  result=await ref.transaction(room=>{if(!room||room.status!=='waiting'||room.hostUid===firebaseUser.uid||room.guestUid)return;room.guestUid=firebaseUser.uid;return room;});
+  if(!result.committed){msg.textContent='No encontramos una sala disponible con ese código, o ya está llena.';return;}
+  activeRoomCode=code;roomRole='guest';roomRef=ref;document.querySelector('#joinRoomView').style.display='none';document.querySelector('#joinedRoomView').style.display='block';document.querySelector('#multiTitle').textContent='TE HAS UNIDO';document.querySelector('#multiSubtitle').textContent='Conectado a la sala online.';document.querySelector('#joinedCodeText').textContent=code;
+  roomListener=snap=>{const room=snap.val();const box=document.querySelector('#joinedRoomView .lobbyStatus');if(!room){box.innerHTML='<b>La sala se cerró.</b>';return;}box.innerHTML='<b>Conectado a la sala online.</b><p class="mutedNote">Jugadores: '+(room.guestUid?2:1)+' / 2 · Estado: '+(room.status==='started'?'partida iniciada':'esperando al anfitrión')+'.</p>';};ref.on('value',roomListener);
+ }catch(e){console.error(e);msg.textContent='No se pudo entrar. Comprueba que las reglas de Realtime Database estén configuradas.';}
+}
+async function leaveRoom(){try{if(activeRoomCode&&firebaseDb&&firebaseUser){const ref=firebaseDb.ref('rooms/'+activeRoomCode);if(roomRole==='host'){await ref.remove();}else{await ref.transaction(room=>{if(!room)return room;if(room.guestUid===firebaseUser.uid)room.guestUid=null;return room;});}}}catch(e){console.error(e);}stopRoomPoll();showRoomChoices();}
+async function hostStartOnline(){if(roomRole!=='host'||!roomRef)return;try{const snap=await roomRef.get();const room=snap.val();if(!room||!room.guestUid){showToast('Espera a que se una el segundo jugador.');return;}await roomRef.update({status:'started'});showToast('Sala lista. El combate online sincronizado llegará en la siguiente fase.');}catch(e){showToast('No se pudo iniciar: revisa las reglas de Firebase.');}}
+function resetGame(){
+  if(!document.querySelector('#modeBtn')){document.querySelector('#card').innerHTML=menuMarkup;bindMenuButtons();}
+  resetState(playerState,-3,0);resetState(enemyState,3,0);
+  player.group.position.copy(playerState.pos);enemy.group.position.copy(enemyState.pos);
+  energy=0;specialCharge=0;legendaryCharge=0;legendaryPhase='idle';legendaryTime=0;clearLegendaryVisuals();timeLeft=240;boostCooldown=attackCooldown=specialCooldown=0;clashTimer=clashCooldown=clashFlash=0;driftHeld=false;running=false;ended=false;ultimateActive=false;mashActive=false;
+  document.querySelector('#overlay').style.display='flex';document.querySelector('#shopPanel').style.display='none';document.querySelector('#mashPrompt').style.display='none';document.querySelector('#startBtn').textContent=gameMode==='ai'?'EMPEZAR COMBATE VS IA':'EMPEZAR COMBATE 2 JUGADORES';updateHud();refreshShop();
+}
+function startGame(){resetState(playerState,-3,0);resetState(enemyState,3,0);energy=0;specialCharge=0;legendaryCharge=0;legendaryPhase='idle';legendaryTime=0;clearLegendaryVisuals();timeLeft=240;boostCooldown=attackCooldown=specialCooldown=0;clashTimer=clashCooldown=clashFlash=0;driftHeld=false;running=true;ended=false;ultimateActive=false;mashActive=false;document.querySelector('#overlay').style.display='none';document.querySelector('#mashPrompt').style.display='none';const item=selectedTop();player.group.children.forEach(o=>{if(o.material&&o.material.color){if(o.material.color.getHex()===player.color)o.material.color.setHex(item.color);if(o.material.color.getHex()===player.accent)o.material.color.setHex(item.accent);}});if(saveData.skin==='gold'){player.group.children.forEach(o=>{if(o.material&&o.material.color&&(o.material.color.getHex()===item.color||o.material.color.getHex()===item.accent))o.material.color.setHex(0xffd66e);});}player.color=item.color;player.accent=item.accent;playerState.hull=1000*item.defense;playerState.stats=item;enemyState.stats={attack:1,defense:1,mobility:1};enemyState.ai=gameMode==='ai';showToast(gameMode==='ai'?'¡Combate iniciado!':'¡Jugador 2: flechas, Enter, Shift derecho y Ctrl derecho!');}
+bindMenuButtons();
+document.querySelector('#createRoomBtn').addEventListener('click',createRoom);
+document.querySelector('#joinRoomBtn').addEventListener('click',showJoinForm);
+document.querySelector('#submitJoinBtn').addEventListener('click',joinRoom);
+document.querySelector('#cancelJoinBtn').addEventListener('click',showRoomChoices);
+document.querySelector('#closeMultiBtn').addEventListener('click',()=>{stopRoomPoll();document.querySelector('#multiPanel').style.display='none';document.querySelector('#overlay').style.display='flex';});
+document.querySelector('#leaveRoomBtn').addEventListener('click',leaveRoom);
+document.querySelector('#copyRoomBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(activeRoomCode||'');showToast('Código copiado.');}catch(e){showToast('Código: '+(activeRoomCode||''));}});
+document.querySelector('#hostStartBtn').addEventListener('click',hostStartOnline);
+document.querySelector('#cancelJoinBtn').addEventListener('click',showRoomChoices);
+document.querySelector('#closeMultiBtn').addEventListener('click',()=>{stopRoomPoll();document.querySelector('#multiPanel').style.display='none';document.querySelector('#overlay').style.display='flex';});
+document.querySelector('#leaveRoomBtn').addEventListener('click',leaveRoom);
+document.querySelector('#copyRoomBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(activeRoomCode);showToast('Código copiado: '+activeRoomCode);}catch(e){showToast('Código de sala: '+activeRoomCode);}});
+document.querySelector('#closeShop').addEventListener('click',()=>document.querySelector('#shopPanel').style.display='none');
+document.querySelector('#howBtn').addEventListener('click',()=>{const t=document.querySelector('#howText');t.style.display=t.style.display==='none'?'block':'none';});
+function boost(){if(!running||ended||boostCooldown>0||playerState.spin<18)return;playerState.boosting=.55;boostCooldown=1.2;playerState.spin=Math.max(0,playerState.spin-12);showToast('¡Impulso!');}
+document.querySelector('#boost').addEventListener('pointerdown',e=>{e.preventDefault();boost();});
+document.querySelector('#attack').addEventListener('pointerdown',e=>{e.preventDefault();attack();});
+const driftButton=document.querySelector('#drift');
+driftButton.addEventListener('pointerdown',e=>{e.preventDefault();driftHeld=true;driftButton.setPointerCapture(e.pointerId);});
+function stopDrift(){driftHeld=false;}
+driftButton.addEventListener('pointerup',stopDrift);driftButton.addEventListener('pointercancel',stopDrift);driftButton.addEventListener('lostpointercapture',stopDrift);
+window.addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='ShiftLeft'||e.code==='ShiftRight')driftHeld=false;});
+function attack(forP2=false){
+  const s=forP2?enemyState:playerState;
+  if(!running||ended||mashActive||ultimateActive||attackCooldown>0||s.spin<18)return;
+  s.attackWindup=.13;s.attackActive=.26;s.attackPower=(s.stats?.attack||1);
+  s.spin=Math.max(0,s.spin-18);attackCooldown=.62;
+  if(!forP2)showToast('¡Embestida!');
+}
+function activateUltimate(){
+ if(!running||ended||mashActive||ultimateActive||specialCharge<100)return;
+ specialCharge=0;ultimateActive=true;ultimateTime=0;mashP1=0;mashP2=0;mashWinner=null;
+ playerState.vel.set(0,0,0);enemyState.stun=Math.max(enemyState.stun,.5);showToast('¡TÉCNICA DE LOS TUBOS ACTIVADA!');
+}
+document.querySelector('#ultimate').addEventListener('pointerdown',e=>{e.preventDefault();activateUltimate();});
+document.querySelector('#ultBurst').addEventListener('pointerdown',e=>{e.preventDefault();activateLegendaryUlt();});
+
+// ULTRA TÉCNICA CINEMATOGRÁFICA: espada flotante, carga pasiva y combo de caballero.
+function makeMat(color, metalness=.35, roughness=.3, emissive=0x000000){
+ return new THREE.MeshStandardMaterial({color,metalness,roughness,emissive,emissiveIntensity:emissive?0.45:0});
+}
+function addPart(group,geo,mat,x,y,z,rx=0,ry=0,rz=0){
+ const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);m.castShadow=true;group.add(m);return m;
+}
+function makeFloatingSword(){
+ const g=new THREE.Group();
+ const blade=makeMat(0xbfefff,.75,.18,0x48baff), gold=makeMat(0xffd875,.7,.22,0xffa522), grip=makeMat(0x18243e,.55,.28);
+ addPart(g,new THREE.BoxGeometry(.105,.92,.075),blade,0,.55,0,0,0,-.12);
+ addPart(g,new THREE.ConeGeometry(.075,.22,4),blade,0,1.12,0,0,0,Math.PI);
+ addPart(g,new THREE.BoxGeometry(.42,.09,.12),gold,0,.12,0,0,0,-.12);
+ addPart(g,new THREE.CylinderGeometry(.045,.055,.30,8),grip,0,-.08,0);
+ addPart(g,new THREE.SphereGeometry(.09,10,8),gold,0,-.25,0);
+ g.scale.setScalar(.8);scene.add(g);return g;
+}
+function clearLegendaryVisuals(){
+ if(legendarySword){scene.remove(legendarySword);legendarySword.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});legendarySword=null;}
+ if(legendaryKnight){scene.remove(legendaryKnight);legendaryKnight.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});legendaryKnight=null;}
+ for(const g of legendaryGhosts){scene.remove(g);g.traverse(o=>{if(o.material)o.material.dispose();});}
+ legendaryGhosts=[];
+}
+function makeBlueKnight(){
+ const g=new THREE.Group();
+ const armor=makeMat(0x247cff,.7,.22,0x125cff), bright=makeMat(0x91e8ff,.55,.18,0x36baff), dark=makeMat(0x14264a,.45,.35), horseMat=makeMat(0x174caa,.55,.28,0x073cff), mane=makeMat(0x45d9ff,.5,.22,0x11aaff), steel=makeMat(0xd9f6ff,.8,.15,0x6bcfff);
+ // Caballo azul, cuatro patas, cuerpo, cuello y cabeza
+ addPart(g,new THREE.CapsuleGeometry(.32,.72,4,8),horseMat,0,.62,0,0,0,Math.PI/2);
+ addPart(g,new THREE.CylinderGeometry(.18,.25,.65,8),horseMat,.42,.94,.02,0,0,-.55);
+ addPart(g,new THREE.SphereGeometry(.22,12,9),horseMat,.68,1.13,.03,0,0,-.3);
+ addPart(g,new THREE.ConeGeometry(.09,.32,7),horseMat,.79,1.32,-.10,0,0,-.4);
+ addPart(g,new THREE.ConeGeometry(.09,.32,7),horseMat,.79,1.32,.13,0,0,-.4);
+ addPart(g,new THREE.BoxGeometry(.12,.48,.10),mane,.42,1.2,.12,0,0,-.45);
+ for(const x of [-.28,.22])for(const z of [-.18,.18]){
+  addPart(g,new THREE.CylinderGeometry(.07,.09,.43,7),horseMat,x,.29,z,0,0,x<0?-.12:.12);
+  addPart(g,new THREE.SphereGeometry(.09,8,6),dark,x,.08,z);
+ }
+ // Jinete con armadura, casco, hombros y espada
+ addPart(g,new THREE.CylinderGeometry(.22,.29,.52,8),armor,.02,1.25,0,0,0,-.08);
+ addPart(g,new THREE.SphereGeometry(.22,10,8),bright,.05,1.66,0);
+ addPart(g,new THREE.ConeGeometry(.17,.35,8),armor,.05,1.91,0);
+ addPart(g,new THREE.BoxGeometry(.22,.09,.32),steel,.05,1.68,.18);
+ addPart(g,new THREE.SphereGeometry(.13,8,6),armor,-.27,1.38,0);
+ addPart(g,new THREE.SphereGeometry(.13,8,6),armor,.29,1.38,0);
+ addPart(g,new THREE.CylinderGeometry(.045,.06,.62,8),steel,.46,1.46,.04,0,0,-.35);
+ addPart(g,new THREE.BoxGeometry(.09,.72,.055),steel,.58,1.88,.04,0,0,-.35);
+ addPart(g,new THREE.BoxGeometry(.28,.07,.08),bright,.46,1.6,.04,0,0,-.35);
+ g.scale.setScalar(.9);scene.add(g);return g;
+}
+function makeGhost(){
+ const g=player.group.clone(true);
+ g.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=true;o.material.opacity=.32;o.material.emissive=new THREE.Color(0x3b9dff);o.material.emissiveIntensity=.65;}});
+ scene.add(g);return g;
+}
+function activateLegendaryUlt(){
+ if(!running||ended||mashActive||ultimateActive||legendaryPhase!=='idle'||legendaryCharge<100)return;
+ legendaryCharge=0;legendaryPhase='dash';legendaryTime=0;legendaryHitCount=0;legendaryLastHit=-1;
+ const input=getPlayerInput();
+ if(playerState.vel.lengthSq()>.5)legendaryDir.copy(playerState.vel).setY(0).normalize();
+ else if(input.lengthSq()>.1)legendaryDir.copy(input).setY(0).normalize();
+ else legendaryDir.set(enemyState.pos.x-playerState.pos.x,0,enemyState.pos.z-playerState.pos.z).normalize();
+ if(legendaryDir.lengthSq()<.01)legendaryDir.set(1,0,0);
+ playerState.vel.copy(legendaryDir).multiplyScalar(16);
+ playerState.stun=0;
+ if(!legendarySword)legendarySword=makeFloatingSword();
+ legendarySword.visible=false;
+ showToast('¡ULTRA TÉCNICA! ¡CARGA CONTRA EL RIVAL!');
+}
+function startLegendaryCombo(){
+ legendaryPhase='combo';legendaryTime=0;playerState.vel.set(0,0,0);enemyState.vel.set(0,0,0);
+ const mid=playerState.pos.clone().add(enemyState.pos).multiplyScalar(.5);
+ playerState.pos.copy(mid).addScaledVector(legendaryDir,-.85);enemyState.pos.copy(mid).addScaledVector(legendaryDir,.85);
+ if(!legendaryKnight)legendaryKnight=makeBlueKnight();
+ legendaryKnight.visible=true;
+ showToast('¡EL CABALLERO AZUL SE UNE AL ATAQUE!');
+}
+function legendaryHit(damage, color=0x70cfff){
+ enemyState.hull=Math.min(enemyState.hull,Math.max(120,enemyState.hull-damage));
+ enemyState.spin=Math.min(enemyState.spin,Math.max(35,enemyState.spin-damage*.22));
+ enemyState.stun=Math.max(enemyState.stun,.32);
+ burst(new THREE.Vector3(enemyState.pos.x,.35,enemyState.pos.z),color,18,3.5);
+ ringBurst(new THREE.Vector3(enemyState.pos.x,.15,enemyState.pos.z),color);
+}
+function updateLegendaryVisuals(dt){
+ if(legendarySword){
+  const ready=legendaryCharge>=100&&legendaryPhase==='idle'&&running&&!ended;
+  legendarySword.visible=ready;
+  if(ready){
+   legendarySword.position.set(playerState.pos.x+.85,1.0+Math.sin(performance.now()*.006)*.13,playerState.pos.z+.12);
+   legendarySword.rotation.set(.15,performance.now()*.0014,-.35);
+  }
+ }
+ if(legendaryPhase==='combo'&&legendaryKnight){
+  const t=legendaryTime, behind=playerState.pos.clone().addScaledVector(legendaryDir,-2.2);
+  legendaryKnight.position.set(behind.x,Math.abs(Math.sin(t*9))*.12,behind.z);
+  legendaryKnight.rotation.y=Math.atan2(legendaryDir.x,legendaryDir.z)+Math.PI;
+  legendaryKnight.rotation.z=Math.sin(t*8)*.08;
+ }
+ for(const g of legendaryGhosts){
+  g.userData.life-=dt;g.material;g.traverse(o=>{if(o.isMesh&&o.material)o.material.opacity=Math.max(0,g.userData.life/.5)*.32;});
+  if(g.userData.life<=0){scene.remove(g);g.traverse(o=>{if(o.material)o.material.dispose();});legendaryGhosts.splice(legendaryGhosts.indexOf(g),1);}
+ }
+}
+
+const pad=document.querySelector('#movePad'), knob=document.querySelector('#padKnob');
+let padActive=false,padVec={x:0,y:0};
+function updatePad(e){
+ const r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+ let dx=e.clientX-cx,dy=e.clientY-cy,lim=r.width*.34;
+ const l=Math.hypot(dx,dy);if(l>lim){dx=dx/l*lim;dy=dy/l*lim;}
+ padVec.x=dx/lim;padVec.y=dy/lim;
+ knob.style.left=(r.width/2-28+dx)+'px';knob.style.top=(r.height/2-28+dy)+'px';
+}
+pad.addEventListener('pointerdown',e=>{padActive=true;pad.setPointerCapture(e.pointerId);updatePad(e);});
+pad.addEventListener('pointermove',e=>{if(padActive)updatePad(e);});
+function releasePad(){padActive=false;padVec={x:0,y:0};knob.style.left='calc(50% - 28px)';knob.style.top='calc(50% - 28px)';}
+pad.addEventListener('pointerup',releasePad);pad.addEventListener('pointercancel',releasePad);
+function getPlayerInput(){
+ // En modo local, el jugador 1 usa WASD y el jugador 2 las flechas, sin pelearse por las mismas teclas.
+ let x=(keys.KeyD|| (gameMode!=='local'&&keys.ArrowRight)?1:0)-(keys.KeyA||(gameMode!=='local'&&keys.ArrowLeft)?1:0);
+ let z=(keys.KeyS||(gameMode!=='local'&&keys.ArrowDown)?1:0)-(keys.KeyW||(gameMode!=='local'&&keys.ArrowUp)?1:0);
+ if(padActive){x=padVec.x;z=padVec.y;}
+ const l=Math.hypot(x,z);if(l>1){x/=l;z/=l;}
+ return new THREE.Vector3(x,0,z);
+}
+function aiInput(s,dt){
+ const to=new THREE.Vector3(playerState.pos.x-s.pos.x,0,playerState.pos.z-s.pos.z);
+ const d=to.length(); if(d>.001)to.normalize();
+ const side=new THREE.Vector3(-to.z,0,to.x).multiplyScalar(Math.sin(performance.now()/700)*.35);
+ const move=to.multiplyScalar(d>1.65?1:.35).add(side).multiplyScalar(s.stats?.mobility||1);
+ if(d<2.0 && s.attackWindup<=0 && Math.random()<dt*.95 && attackCooldown<.1){s.attackWindup=.22;s.attackActive=.23;s.attackPower=1;s.spin=Math.max(0,s.spin-18);}
+ if(d>3.1&&s.spin>12&&s.boosting<=0&&Math.random()<dt*.25){s.boosting=.35;s.spin-=2;}
+ return move;
+}
+function applyMovement(s,input,dt,isPlayer){
+ if(s.stun>0){s.stun=Math.max(0,s.stun-dt);input.multiplyScalar(.12);}
+ const hasInput=input.lengthSq()>.06;
+ const velocityDir=s.vel.clone();if(velocityDir.lengthSq()>.05)velocityDir.normalize();
+ const inputDir=input.clone();if(inputDir.lengthSq()>.05)inputDir.normalize();
+ const turnAmount=(velocityDir.lengthSq()>.05&&inputDir.lengthSq()>.05)?(1-THREE.MathUtils.clamp(velocityDir.dot(inputDir),-1,1))*.5:0;
+ const isDrifting=isPlayer?driftHeld:(hasInput&&turnAmount>.22&&s.spin>12&&Math.sin(performance.now()/650)>.1);
+ s.drift=isDrifting?Math.min(1,s.drift+dt*1.1):Math.max(0,s.drift-dt*.8);
+ const accel=(s.boosting>0?11:7.2)*(isDrifting?(turnAmount>.22?1.28:.82):1);
+ s.vel.addScaledVector(input,accel*dt*(s.stats?.mobility||1));
+ let maxSpeed=(s.boosting>0?6.8:4.5)*(s.stats?.mobility||1);
+ if(isDrifting)maxSpeed*=turnAmount>.22?1.48:.88;
+ if(s.driftWobble>0){s.driftWobble=Math.max(0,s.driftWobble-dt);const wobble=Math.sin(performance.now()*.021+(isPlayer?0:2))*s.driftWobble*2.0;s.vel.x+=wobble*dt;s.vel.z+=Math.cos(performance.now()*.019)*s.driftWobble*dt;}
+ if(s.vel.length()>maxSpeed)s.vel.setLength(maxSpeed);
+ s.vel.multiplyScalar(Math.exp(-.95*dt));
+ s.pos.addScaledVector(s.vel,dt);
+ if(s.boosting>0){s.boosting=Math.max(0,s.boosting-dt);s.spin=Math.max(0,s.spin-18*dt);}
+ else s.spin=Math.max(0,s.spin-.18*dt);
+ if(isDrifting){
+   const drain=turnAmount>.22?7.5:4.2;
+   s.stability=Math.max(0,s.stability-drain*dt);
+   s.spin=Math.max(0,s.spin-(turnAmount>.22?4.5:1.8)*dt);
+   if(s.stability<35){s.driftWobble=Math.max(s.driftWobble,(35-s.stability)/35*.85);}
+ }else{s.stability=Math.min(100,s.stability+17*dt);s.driftWobble=Math.max(0,s.driftWobble-dt*.8);}
+ if(s.stability<=0&&isDrifting){s.driftWobble=Math.max(s.driftWobble,1.25);if(isPlayer&&Math.random()<dt*1.5)showToast('¡Perdiste el control del deslizamiento!');}
+ // La arena tiene una zona de seguridad amplia: solo una salida con mucho impulso cuenta como expulsión.
+ const dist=Math.hypot(s.pos.x,s.pos.z);
+ if(dist>8.35&&s.vel.length()>5.8){finish(isPlayer?'¡El jugador 2 gana por expulsión!':'¡Victoria por expulsión!');return;}
+ if(dist>8.05){s.pos.setLength(8.05);s.vel.multiplyScalar(-.22);s.spin=Math.max(0,s.spin-2);if(isPlayer&&Math.random()<dt*1.2)showToast('¡Rozaste el límite de la arena!');}
+ // Moverse con velocidad y mantener una trayectoria amplia recupera giro; quedarse quieto no.
+ const speed=s.vel.length();
+ if(speed>1.15&&s.boosting<=0&&!isDrifting&&s.attackActive<=0){
+   const recovery=1.8+Math.min(2.8,speed*.48);
+   s.spin=Math.min(1200,s.spin+recovery*dt);
+ }
+ s.spinAngle+=dt*(20+s.spin*.018)*(s.boosting>0?1.35:1)*(isDrifting?1.12:1);
+}
+function collide(a,b,isAPlayer){
+ const dx=b.pos.x-a.pos.x,dz=b.pos.z-a.pos.z,d=Math.hypot(dx,dz),min=1.12;
+ if(d>=min){if(isAPlayer)clashTimer=Math.max(0,clashTimer-.9/60);return;}
+ if(d<.0001)return;
+ const nx=dx/d,nz=dz/d,overlap=min-d;
+ a.pos.x-=nx*overlap*.5;a.pos.z-=nz*overlap*.5;b.pos.x+=nx*overlap*.5;b.pos.z+=nz*overlap*.5;
+ const rel=(a.vel.x-b.vel.x)*nx+(a.vel.z-b.vel.z)*nz;
+ // El contacto sostenido acumula presión incluso si ya no hay una gran velocidad relativa.
+ if(isAPlayer){clashTimer+=Math.min(.05,Math.max(.008,Math.abs(rel)*.012));}
+ const impact=Math.max(0,rel);
+ if(impact>.15){
+   const impulse=impact*.78+.35;
+   a.vel.x-=nx*impulse*.42;a.vel.z-=nz*impulse*.42;b.vel.x+=nx*impulse*.42;b.vel.z+=nz*impulse*.42;
+   // Cada colisión roba velocidad a ambos, incluso al que gana el intercambio.
+   a.vel.multiplyScalar(.86);b.vel.multiplyScalar(.86);
+   a.spin=Math.max(0,a.spin-(2.2+impulse*1.15));b.spin=Math.max(0,b.spin-(2.2+impulse*1.15));
+   const aAttack=a.attackActive>0&&a.attackWindup<=0;
+   const bAttack=b.attackActive>0&&b.attackWindup<=0;
+   const aPower=aAttack?a.attackPower:0.25,bPower=bAttack?b.attackPower:0.25;
+   const dmgToB=Math.min(75,8+impulse*3.8*aPower),dmgToA=Math.min(75,8+impulse*3.8*bPower);
+   b.hull=Math.max(0,b.hull-dmgToB*(aAttack?1.0:.35)/(b.stats?.defense||1));a.hull=Math.max(0,a.hull-dmgToA*(bAttack?1.0:.35)/(a.stats?.defense||1));
+   b.spin=Math.max(0,b.spin-(aAttack?dmgToB*.24:0));a.spin=Math.max(0,a.spin-(bAttack?dmgToA*.24:0));
+   if(aAttack&&isAPlayer){energy=Math.min(100,energy+10);specialCharge=Math.min(100,specialCharge+Math.max(9,impulse*4.5));}
+   if(bAttack&&gameMode==='local')specialCharge=Math.min(100,specialCharge+Math.max(7,impulse*3));
+   if(aAttack){b.stun=Math.max(b.stun,.12);a.attackActive=0;}
+   if(bAttack){a.stun=Math.max(a.stun,.12);b.attackActive=0;}
+   const p=new THREE.Vector3((a.pos.x+b.pos.x)/2,.22,(a.pos.z+b.pos.z)/2);
+   if(impact>.8){burst(p,aAttack?0x5cecff:0xffbb68,10,1.8);ringBurst(p,aAttack?0x5cecff:0xffa04b);}
+   if(isAPlayer&&impact>.4)showToast(aAttack?'¡Impacto acertado! +10 energía':'¡Colisión! Ambos pierden velocidad');
+ }
+ // Si quedan enganchados demasiado tiempo, la presión acumulada provoca una expulsión.
+ if(isAPlayer&&clashTimer>1.65&&clashCooldown<=0){
+   const aScore=a.vel.length()+a.stability*.012+a.spin*.003;
+   const bScore=b.vel.length()+b.stability*.012+b.spin*.003;
+   const loser=aScore>=bScore?b:a, winner=loser===a?b:a;
+   const lx=loser.pos.x-winner.pos.x,lz=loser.pos.z-winner.pos.z,ll=Math.hypot(lx,lz)||1;
+   loser.vel.set(lx/ll*9,0,lz/ll*9);loser.pos.x+=lx/ll*.8;loser.pos.z+=lz/ll*.8;
+   loser.spin=Math.max(0,loser.spin-12);loser.hull=Math.max(0,loser.hull-8);
+   loser.stability=Math.max(0,loser.stability-24);winner.vel.multiplyScalar(.55);
+   burst(new THREE.Vector3(loser.pos.x,.4,loser.pos.z),loser===playerState?0x5cecff:0xffbd63,30,4.2);
+   ringBurst(new THREE.Vector3(loser.pos.x,.1,loser.pos.z),0xffffff);
+   clashTimer=0;clashCooldown=1.2;
+   showToast(loser===playerState?'¡Te lanzaron fuera del forcejeo!':'¡El rival salió despedido!');
+ }
+}
+function refreshShop(){
+ const grid=document.querySelector('#shopGrid');if(!grid)return;grid.innerHTML='';
+ for(const item of shopItems){const owned=saveData.owned.includes(item.id);const selected=saveData.selected===item.id;const card=document.createElement('div');card.className='shopitem';const stats=item.cosmetic?'Solo cambia el diseño':`Daño ${Math.round(item.attack*100)}% · Defensa ${Math.round(item.defense*100)}% · Movilidad ${Math.round(item.mobility*100)}%`;card.innerHTML=`<h3>${item.name} ${selected?'✓':''}</h3><p>${item.desc}<br><b>${stats}</b></p><button>${selected?'EQUIPADO':owned?'EQUIPAR':`COMPRAR · ${item.cost} monedas`}</button>`;card.querySelector('button').onclick=()=>{if(!owned){if(saveData.coins<item.cost){showToast('No tienes suficientes monedas. Gana combates para conseguir más.');return;}saveData.coins-=item.cost;saveData.owned.push(item.id);}if(item.cosmetic){saveData.skin=item.id;saveData.selected=saveData.selected||'classic';}else saveData.selected=item.id;saveProgress();refreshShop();updateHud();showToast(`${item.name}: guardado`);};grid.appendChild(card);}
+ document.querySelector('#coinText').textContent=saveData.coins;document.querySelector('#shopCoins').textContent=saveData.coins;
+}
+function player2Input(){let x=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0),z=(keys.ArrowDown?1:0)-(keys.ArrowUp?1:0);const l=Math.hypot(x,z);if(l>1){x/=l;z/=l;}return new THREE.Vector3(x,0,z);}
+function startMash(){mashActive=true;mashTime=3.2;mashP1=0;mashP2=0;document.querySelector('#mashPrompt').style.display='block';document.querySelector('#mashText').textContent=gameMode==='local'?'Jugador 1: botón ¡PULSAR! · Jugador 2: ENTER':'¡Pulsa rápido para superar al rival!';}
+function resolveMash(){mashActive=false;document.querySelector('#mashPrompt').style.display='none';const aiScore=gameMode==='ai'?Math.floor(7+Math.random()*12):mashP2;const p1=mashP1;if(p1>=aiScore){enemyState.hull=Math.max(0,enemyState.hull-1000);enemyState.spin=0;mashWinner=1;finish('¡Gana el jugador 1!');}else{playerState.hull=Math.max(0,playerState.hull-1000);playerState.spin=0;mashWinner=2;finish(gameMode==='ai'?'¡El rival gana el duelo final!':'¡Gana el jugador 2!');}}
+document.querySelector('#mashButton').addEventListener('pointerdown',e=>{e.preventDefault();if(mashActive)mashP1++;});
+
+function updateTopVisual(top,s,dt,isPlayer){
+ top.group.position.set(s.pos.x,Math.max(0,Math.sin(s.spinAngle*.6)*.025),s.pos.z);
+ top.group.rotation.y=s.spinAngle;
+ top.group.rotation.x=Math.sin(s.spinAngle*.47)*.045;
+ top.group.rotation.z=Math.cos(s.spinAngle*.39)*.045;
+ top.ring.material.opacity=.55+Math.sin(s.spinAngle*2)*.25;
+ top.aura.material.opacity=.3+s.spin/1500;
+ const scale=.76+s.spin/4800;
+ top.group.scale.setScalar(scale);
+ if(s.attackWindup>0){top.aura.scale.setScalar(1.25+Math.sin(performance.now()*.035)*.12);}
+ else top.aura.scale.setScalar(1);
+}
+function updateHud(){
+ const set=(id,v)=>document.getElementById(id).style.width=Math.max(0,v)+'%';
+ set('playerSpin',playerState.spin/12);set('playerHull',playerState.hull/10);set('enemySpin',enemyState.spin/12);set('enemyHull',enemyState.hull/10);
+ document.querySelector('#pSpinText').textContent=Math.ceil(playerState.spin)+' / 1200';
+ document.querySelector('#pHullText').textContent=Math.ceil(playerState.hull);
+ document.querySelector('#eSpinText').textContent=Math.ceil(enemyState.spin)+' / 1200';
+ document.querySelector('#eHullText').textContent=Math.ceil(enemyState.hull);
+ document.querySelector('#energyText').textContent=Math.floor(energy);
+ document.querySelector('#ultChargeFill').style.width=legendaryCharge+'%';document.querySelector('#ultChargeText').textContent=Math.floor(legendaryCharge);
+ document.querySelector('#energyFill').style.width=energy+'%';document.querySelector('#specialFill').style.width=specialCharge+'%';document.querySelector('#specialText').textContent=Math.floor(specialCharge);
+ document.querySelector('#stabilityText').textContent=Math.ceil(playerState.stability);
+ document.querySelector('#stabilityFill').style.width=playerState.stability+'%';
+ document.querySelector('#timer').textContent=String(Math.floor(timeLeft/60)).padStart(2,'0')+':'+String(Math.floor(timeLeft%60)).padStart(2,'0');
+ document.querySelector('#status').textContent=ended?'FIN DEL COMBATE':running?'EN COMBATE':'PREPARADOS';
+ document.querySelector('#boost').style.opacity=boostCooldown>0?'.55':'1';
+ document.querySelector('#attack').style.opacity=attackCooldown>0?'.55':'1';
+ document.querySelector('#drift').style.background=driftHeld?'#543d80dd':'#101a30dd';document.querySelector('#ultimate').style.opacity=specialCharge>=100?'1':'.45';document.querySelector('#ultBurst').style.opacity=legendaryCharge>=100&&legendaryPhase==='idle'?'1':'.45';document.querySelector('#ultBurst').style.boxShadow=legendaryCharge>=100?'0 0 22px #4bcaffaa':'none';document.querySelector('#coinText').textContent=saveData.coins;document.querySelector('#shopCoins').textContent=saveData.coins;
+}
+function finish(text){
+ ended=true;running=false; if(text.includes('Victoria del jugador')||text.includes('Gana el jugador 1')){saveData.coins+=35;saveData.wins++;saveProgress();}else if(text.includes('Gana el jugador 2')){saveData.coins+=15;saveProgress();}
+ document.querySelector('#card').innerHTML=`<div style="font-size:12px;letter-spacing:.2em;color:#75dfff;font-weight:900;margin-bottom:12px">FIN DEL COMBATE</div><h1>${text}</h1><p class="sub">Prototipo 0.6 · Las victorias dan monedas; el progreso se guarda localmente.</p><div class="rowbuttons"><button class="primary" id="again">VOLVER A JUGAR</button><button class="secondary" id="menu">VOLVER AL MENÚ</button></div><p style="font-size:11px;color:#7183a6;margin-top:18px">Siguiente objetivo: ajustar controles, impactos y equilibrio.</p>`;
+ document.querySelector('#overlay').style.display='flex';
+ document.querySelector('#again').onclick=startGame;
+ document.querySelector('#menu').onclick=()=>{resetGame();};
+}
+function animate(now){
+ requestAnimationFrame(animate);
+ const dt=Math.min((now-lastTime)/1000,.04);lastTime=now;
+ if(running&&!ended){
+   if(!ultimateActive&&!mashActive)timeLeft-=dt;if(timeLeft<=0&&!mashActive&&!ultimateActive){timeLeft=0;finish(playerState.hull+playerState.spin>=enemyState.hull+enemyState.spin?'¡Victoria del jugador!':'¡Victoria del rival!');}
+   boostCooldown=Math.max(0,boostCooldown-dt);attackCooldown=Math.max(0,attackCooldown-dt);specialCooldown=Math.max(0,specialCooldown-dt);clashCooldown=Math.max(0,clashCooldown-dt);
+   if(legendaryPhase==='idle'&&!ultimateActive&&!mashActive)legendaryCharge=Math.min(100,legendaryCharge+dt*(100/38));
+   playerState.attackWindup=Math.max(0,playerState.attackWindup-dt);playerState.attackActive=Math.max(0,playerState.attackActive-dt);
+   enemyState.attackWindup=Math.max(0,enemyState.attackWindup-dt);enemyState.attackActive=Math.max(0,enemyState.attackActive-dt);
+   if(ultimateActive){
+     ultimateTime+=dt;
+     const t=ultimateTime, radius=5.4, angle=t*5.7;
+     playerState.pos.set(Math.cos(angle)*radius,0,Math.sin(angle)*radius);
+     playerState.spin=Math.max(1,playerState.spin-.4*dt);
+     camera.position.set(playerState.pos.x+Math.cos(angle+1)*5,3.2,playerState.pos.z+Math.sin(angle+1)*5);camera.lookAt(playerState.pos.x,0,playerState.pos.z);
+     if(t>2.2&&Math.floor(t*5)%2===0){enemyState.hull=Math.max(120,enemyState.hull-10);burst(new THREE.Vector3(enemyState.pos.x,.25,enemyState.pos.z),0xe7a5ff,5,1.2);}
+     if(t>3.3){ultimateActive=false;startMash();}
+   } else if(legendaryPhase==='dash'){
+     legendaryTime+=dt;
+     playerState.pos.addScaledVector(legendaryDir,16*dt);
+     playerState.spin=Math.max(1,playerState.spin-1.2*dt);
+     playerState.spinAngle+=dt*90;
+     camera.position.lerp(new THREE.Vector3(playerState.pos.x-legendaryDir.x*4+2,3.0,playerState.pos.z-legendaryDir.z*4+5),.12);
+     camera.lookAt(playerState.pos.x,0,playerState.pos.z);
+     if(legendarySword){legendarySword.visible=false;}
+     if(playerState.pos.distanceTo(enemyState.pos)<1.65){startLegendaryCombo();}
+     else if(legendaryTime>=2){
+       legendaryPhase='idle';legendaryTime=0;playerState.vel.multiplyScalar(.25);showToast('¡La ultra técnica falló! Intenta apuntar mejor.');
+     }
+   } else if(legendaryPhase==='combo'){
+     legendaryTime+=dt;const t=legendaryTime;
+     // Coreografía: tajos del trompo, carga del caballero, proyecciones y golpe final.
+     playerState.pos.lerp(enemyState.pos.clone().addScaledVector(legendaryDir,-1.05),.18);
+     if(legendaryKnight&&t<3.8){const target=playerState.pos.clone().addScaledVector(legendaryDir,-2.2);legendaryKnight.position.lerp(target,.18);}
+     const beats=[.22,.52,.82,1.22,1.58,2.02,2.42,2.86,3.36];
+     for(let i=0;i<beats.length;i++){
+       if(t>=beats[i]&&legendaryLastHit<i){
+         legendaryLastHit=i;
+         if(i<3){legendaryHit(42,0x6be6ff);}
+         else if(i<6){legendaryHit(48,0x2f86ff);}
+         else if(i<8){
+           legendaryHit(38,0x9beeff);
+           const ghost=makeGhost();ghost.position.copy(enemyState.pos).add(new THREE.Vector3((Math.random()-.5)*2,.05,(Math.random()-.5)*2));ghost.rotation.y=Math.random()*Math.PI*2;ghost.scale.multiplyScalar(.7+Math.random()*.5);ghost.userData.life=.48;legendaryGhosts.push(ghost);
+         }else{
+           legendaryHit(520,0xd6f7ff);
+           enemyState.vel.copy(legendaryDir).multiplyScalar(7.5);
+           burst(new THREE.Vector3(enemyState.pos.x,.7,enemyState.pos.z),0xffffff,45,5.5);
+           ringBurst(new THREE.Vector3(enemyState.pos.x,.12,enemyState.pos.z),0x70dfff);
+           showToast('¡IMPACTO FINAL! ¡EL RIVAL QUEDÓ DESTROZADO!');
+         }
+       }
+     }
+     if(t>=4.0){legendaryPhase='idle';legendaryTime=0;playerState.vel.copy(legendaryDir).multiplyScalar(-1.8);if(legendaryKnight)legendaryKnight.visible=false;legendaryGhosts.forEach(g=>{g.userData.life=0;});camera.position.set(0,12,19);camera.lookAt(0,0,0);}
+   } else if(!mashActive){
+     applyMovement(playerState,getPlayerInput(),dt,true);
+     if(gameMode==='ai')applyMovement(enemyState,aiInput(enemyState,dt),dt,false);else applyMovement(enemyState,player2Input(),dt,false);
+     if(gameMode==='local'&&keys.ShiftRight){enemyState.boosting=.15;}
+     collide(playerState,enemyState,true);
+   }
+   if(mashActive){mashTime-=dt;if(gameMode==='ai')mashP2+=dt*(4.0+Math.random()*2.5);if(mashTime<=0)resolveMash();}
+   if(!ultimateActive&&legendaryPhase==='idle'){camera.position.x+=(playerState.pos.x*.25-camera.position.x)*.02;camera.position.z+=(19-camera.position.z)*.025;camera.lookAt((playerState.pos.x+enemyState.pos.x)*.17,0,(playerState.pos.z+enemyState.pos.z)*.17);} 
+   
+   player.group.position.set(playerState.pos.x,0,playerState.pos.z);
+   enemy.group.position.set(enemyState.pos.x,0,enemyState.pos.z);
+   updateTopVisual(player,playerState,dt,true);updateTopVisual(enemy,enemyState,dt,false);updateLegendaryVisuals(dt);
+   if(!mashActive&&!ultimateActive&&legendaryPhase==='idle'&& (playerState.spin<=0||playerState.hull<=0)){finish(gameMode==='local'?'¡Gana el jugador 2!':'¡Gana el rival!');}
+   else if(!mashActive&&!ultimateActive&&legendaryPhase==='idle'&&(enemyState.spin<=0||enemyState.hull<=0)){finish('¡Victoria del jugador!');}
+   else if(!ultimateActive&&!mashActive&&legendaryPhase==='idle'&&Math.hypot(enemyState.pos.x,enemyState.pos.z)>=7.7){finish('¡Victoria del jugador!');}
+   else if(!ultimateActive&&!mashActive&&legendaryPhase==='idle'&&Math.hypot(playerState.pos.x,playerState.pos.z)>=7.7){finish(gameMode==='local'?'¡Gana el jugador 2!':'¡Gana el rival!');}
+   updateHud();
+ }
+ for(let i=particles.length-1;i>=0;i--){
+   const p=particles[i];p.life-=dt;
+   if(p.ring){p.mesh.scale.multiplyScalar(1+dt*3);p.mesh.material.opacity=Math.max(0,p.life/p.max);}
+   else {p.mesh.position.addScaledVector(p.vel,dt);p.vel.y-=4*dt;p.mesh.material.opacity=Math.max(0,p.life/p.max);}
+   if(p.life<=0){scene.remove(p.mesh);p.mesh.geometry.dispose();p.mesh.material.dispose();particles.splice(i,1);}
+ }
+ if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)document.querySelector('#toast').classList.remove('show');}
+ const target=new THREE.Vector3((playerState.pos.x+enemyState.pos.x)*.17,0,(playerState.pos.z+enemyState.pos.z)*.17);
+ camera.position.x+=(target.x-camera.position.x)*.02;
+ camera.position.z+=(19-camera.position.z)*.025;
+ camera.lookAt(target.x,0,target.z);
+ renderer.render(scene,camera);
+}
+function onResize(){camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);}
+window.addEventListener('resize',onResize);
+refreshShop();resetGame();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
